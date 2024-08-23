@@ -1,0 +1,133 @@
+---
+title: "Independent Research"
+author: "Clair Tan"
+date: "2023-10-30"
+output:
+  html_document:
+    df_print: paged
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+# Load necessary libraries
+#install.packages("ggplot2")
+library(ggplot2)
+
+# Read the dataset
+forest_fires <- read.csv("~/Desktop/UMN/Senior/上/STAT4893W/Independent Research/forest+fires/forestfires.csv")
+
+```
+$\\$
+
+Monthly Distribution of Burned Area: This bar chart displays the total burned area for each month.
+```{r}
+# Monthly distribution of burned area
+monthly_area <- aggregate(area ~ month, data=forest_fires, sum)
+monthly_area <- monthly_area[order(-monthly_area$area), ]
+
+# Plot
+ggplot(monthly_area, aes(x=reorder(month, -area), y=area)) +
+  geom_bar(stat="identity", fill="coral") +
+  labs(title="Monthly Distribution of Burned Area",
+       x="Month", 
+       y="Total Burned Area (ha)") +
+  theme_minimal()
+
+```
+
+
+*The height of each bar represents the total area burned in that month.
+*Months with taller bars indicate periods with higher wildfire activity. If, for instance, the bars for August and September are significantly higher, this suggests that these months are more prone to larger wildfires in Portugal, possibly due to drier conditions or other seasonal factors.
+*Conversely, months with shorter bars had less wildfire activity, indicating they might be wetter or cooler months.
+$\\$
+
+RandomForest:
+```{r}
+# Install and load necessary packages
+#install.packages(c("randomForest", "dplyr", "ggplot2"))
+library(randomForest)
+library(dplyr)
+library(ggplot2)
+```
+
+```{r}
+# Read the dataset
+forest_fires <- read.csv("~/Desktop/UMN/Senior/上/STAT4893W/Independent Research/forest+fires/forestfires.csv")
+
+# Convert 'month' and 'day' columns to factor type
+forest_fires$month <- as.factor(forest_fires$month)
+forest_fires$day <- as.factor(forest_fires$day)
+
+# Split data into training and test sets (80% train, 20% test)
+set.seed(4893)
+train_indices <- sample(1:nrow(forest_fires), 0.8 * nrow(forest_fires))
+train_data <- forest_fires[train_indices, ]
+test_data <- forest_fires[-train_indices, ]
+
+# Train a Random Forest regression model
+set.seed(4893)
+rf_model <- randomForest(area ~ ., data=train_data, ntree=100)
+
+# Print summary of the model
+print(rf_model)
+
+# Predict on the test set and calculate R-squared
+predictions <- predict(rf_model, newdata=test_data)
+actuals <- test_data$area
+SST <- sum((actuals - mean(actuals))^2)
+SSR <- sum((predictions - actuals)^2)
+R2 <- 1 - (SSR/SST)
+print(paste("R-squared:", round(R2, 2)))
+
+# Plot Feature Importance
+importance_data <- data.frame(Feature=row.names(importance(rf_model)), Importance=importance(rf_model)[, "IncNodePurity"])
+
+ggplot(importance_data, aes(x=reorder(Feature, Importance), y=Importance)) +
+  geom_bar(stat="identity", color="pink") +
+  coord_flip() +
+  labs(title="Feature Importance from Random Forest",
+       x="", 
+       y="Importance") +
+  theme_minimal() 
+
+```
+
+
+```{r}
+# Functions for MSE and R2
+mse <- function(actual, predicted) { mean((actual - predicted)^2) }
+r2 <- function(actual, predicted) { 1 - sum((actual - predicted)^2) / sum((actual - mean(actual))^2) }
+
+rf_mse <- mse(test_data$area, predictions)
+rf_r2 <- r2(test_data$area, predictions)
+
+rf_mse
+rf_r2
+sqrt(rf_mse)
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

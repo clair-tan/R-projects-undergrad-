@@ -1,0 +1,318 @@
+---
+title: "Final Draft Code"
+author: "Clair Tan"
+date: "2023-11-13"
+output:
+  pdf_document: default
+  html_document:
+    df_print: paged
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r}
+# Read the dataset
+forest_fires <- read.csv("~/Desktop/UMN/Senior/上/STAT4893W/Independent Research/forest+fires/forestfires.csv")
+```
+
+histogram & correlation plots
+```{r}
+hist(forest_fires$area)
+```
+
+Multiple Linear Regression:
+```{r}
+# Load necessary libraries
+library(readr)
+```
+
+```{r}
+# Convert 'month' and 'day' to factor variables
+forest_fires$month <- as.factor(forest_fires$month)
+forest_fires$day <- as.factor(forest_fires$day)
+```
+
+The key assumptions include linearity, homoscedasticity (constant variance of residuals), independence of errors, and normality of residuals.
+
+```{r fig.height=6}
+mod_full <- lm(area ~ ., data = forest_fires)
+par(mfrow = c(2, 2))
+plot(mod_full)
+```
+
+We may have a constant variance here, by the qqplot we violate the normality situation. The Residuals vs. Leverage plot shows all points are inside the 0.5 boundaries so we do not have a outlier here.
+
+We're going to check the boxcox to find out which transformation we need to do. 
+```{r}
+car::boxCox(mod_full, family = "yjPower" , plotit = T)
+```
+
+
+
+```{r figure.height=6}
+library(MASS)
+forest_fires$transformed_area <- sqrt(forest_fires$area)
+mod_transformed <- lm(transformed_area ~ . -area, data = forest_fires)
+par(mfrow = c(2, 2))
+plot(mod_transformed)
+
+summary(mod_transformed)
+```
+
+
+
+```{r}
+library(caret)
+# Split data into training and test sets (80% train, 20% test)
+set.seed(4893)
+train_indices <- sample(1:nrow(forest_fires), 0.8 * nrow(forest_fires))
+train_data <- forest_fires[train_indices, ]
+test_data <- forest_fires[-train_indices, ]
+
+mod_train <- lm(transformed_area ~ . - area, data = train_data)
+# Predictions and Model Evaluation
+predictions_ml <- predict(mod_train, test_data)
+# Re-transform predictions to original scale
+predictions_original_scale_ml <- predictions_ml^2
+
+# Calculate RMSE and MAE on the original scale
+rmse_ml <- RMSE(predictions_original_scale_ml, test_data$area^2)
+mse_ml <- rmse_ml^2
+mae_ml <- MAE(predictions_original_scale_ml, test_data$area^2)
+
+# Print the results
+print(paste("RMSE:", rmse_ml))
+print(paste("MSE:", mse_ml))
+print(paste("MAE:", mae_ml))
+
+```
+
+
+RandomForest:
+```{r}
+# Install and load necessary packages
+#install.packages(c("randomForest", "dplyr", "ggplot2"))
+library(randomForest)
+library(dplyr)
+library(ggplot2)
+```
+
+```{r}
+# Read the dataset
+forest_fires <- read.csv("~/Desktop/UMN/Senior/上/STAT4893W/Independent Research/forest+fires/forestfires.csv")
+
+# Convert 'month' and 'day' columns to factor type
+forest_fires$month <- as.factor(forest_fires$month)
+forest_fires$day <- as.factor(forest_fires$day)
+forest_fires$transformed_area <- sqrt(forest_fires$area)
+
+# Split data into training and test sets (80% train, 20% test)
+set.seed(4893)
+train_indices <- sample(1:nrow(forest_fires), 0.8 * nrow(forest_fires))
+train_data <- forest_fires[train_indices, ]
+test_data <- forest_fires[-train_indices, ]
+
+# Train a Random Forest regression model
+set.seed(4893)
+rf_model <- randomForest(transformed_area ~ . - area, data=train_data, ntree=100)
+
+# Print summary of the model
+print(rf_model)
+
+# Predict on the test set and calculate R-squared
+predictions <- predict(rf_model, newdata=test_data)
+actuals <- test_data$area
+SST <- sum((actuals - mean(actuals))^2)
+SSR <- sum((predictions - actuals)^2)
+R2 <- 1 - (SSR/SST)
+print(paste("R-squared:", round(R2, 2)))
+
+# Reverse the transformation (if your model was trained on transformed target)
+# If you trained the model on sqrt(transformed_area), reverse it by squaring the predictions
+predictions_original_scale <- predictions^2
+
+# Calculate MSE, RMSE, and MAE
+rf_mse <- mean((test_data$area - predictions_original_scale)^2)
+rf_rmse <- sqrt(rf_mse)
+rf_mae <- mean(abs(test_data$area - predictions_original_scale))
+
+# Print the metrics
+print(paste("MSE:", rf_mse))
+print(paste("RMSE:", rf_rmse))
+print(paste("MAE:", rf_mae))
+
+
+# Plot Feature Importance
+importance_data <- data.frame(Feature=row.names(importance(rf_model)), Importance=importance(rf_model)[, "IncNodePurity"])
+
+ggplot(importance_data, aes(x=reorder(Feature, Importance), y=Importance)) +
+  geom_bar(stat="identity",  fill="pink", color="pink") +
+  coord_flip() +
+  labs(title="Feature Importance from Random Forest",
+       x="", 
+       y="Importance") +
+  theme_minimal() 
+
+```
+The horizontal bars represent different features (variables) from your dataset.
+The length of each bar indicates the importance of that feature in the Random Forest model.
+Features are ordered with the most important feature at the top.
+This plot helps in understanding which features are most predictive in your model and can guide in feature selection or engineering for model improvement.
+
+
+
+
+SVM:
+```{r warning=FALSE}
+library(e1071)
+library(caret)
+
+# Load the data
+data <- read.csv("~/Desktop/UMN/Senior/上/STAT4893W/Independent Research/forest+fires/forestfires.csv")
+
+# Pre-processing
+data$month <- as.factor(data$month)
+data$day <- as.factor(data$day)
+
+# Apply sqrt transformation to 'area'
+data$area <- sqrt(data$area)
+
+# Splitting the dataset
+set.seed(4893) # for reproducibility
+index <- createDataPartition(data$area, p = 0.8, list = FALSE)
+train_data <- data[index, ]
+test_data <- data[-index, ]
+
+# SVM Model with Tuning
+tune_grid <- expand.grid(C = 10^(-2:2), sigma = 10^(-2:2))
+train_control <- trainControl(method = "repeatedcv", number = 10, repeats = 3)
+svm_model <- train(area ~ ., data = train_data, method = "svmRadial",
+                   trControl = train_control, tuneGrid = tune_grid)
+
+# Predictions and Model Evaluation
+predictions <- predict(svm_model, test_data)
+# Re-transform predictions to original scale
+predictions_original_scale <- predictions^2
+
+# Calculate RMSE and MAE on the original scale
+rmse_value <- RMSE(predictions_original_scale, test_data$area^2)
+mse_value <- rmse_value^2
+mae_value <- MAE(predictions_original_scale, test_data$area^2)
+
+# Print the results
+print(paste("RMSE:", rmse_value))
+print(paste("MSE:", mse_value))
+print(paste("MAE:", mae_value))
+
+# AUC is not applicable in this case as 'area' is continuous.
+
+```
+
+
+```{r warning = False}
+library(e1071)
+library(caret)
+# Load the data
+data <- read.csv("~/Desktop/UMN/Senior/上/STAT4893W/Independent Research/forest+fires/forestfires.csv")
+
+# Pre-processing
+data$month <- as.factor(data$month)
+data$day <- as.factor(data$day)
+data$area <- sqrt(data$area) 
+
+# Splitting the dataset
+set.seed(4893)
+index <- createDataPartition(data$area, p = 0.8, list = FALSE)
+train_data <- data[index, ]
+test_data <- data[-index, ]
+
+# Recursive Feature Elimination
+control <- rfeControl(functions = rfFuncs, method = "repeatedcv", number = 10, repeats = 3)
+results <- rfe(train_data[, -ncol(train_data)], train_data$area, sizes = c(1:ncol(train_data) - 1), rfeControl = control)
+```
+> print(results)
+
+Recursive feature selection
+
+Outer resampling method: Cross-Validated (10 fold, repeated 3 times) 
+
+Resampling performance over subset size:
+
+ Variables  RMSE Rsquared   MAE RMSESD RsquaredSD  MAESD Selected
+         0 3.421  0.07897 2.195  1.159    0.09314 0.4318         
+         1 3.424  0.07892 2.195  1.149    0.09121 0.4237         
+         2 3.259  0.08864 2.117  1.221    0.11682 0.4316         
+         3 3.255  0.05637 2.091  1.184    0.06875 0.3851         
+         4 3.226  0.04752 2.095  1.198    0.06198 0.4032         
+         5 3.204  0.05224 2.093  1.202    0.06137 0.3980        *
+         6 3.245  0.05573 2.124  1.226    0.06430 0.4103         
+         7 3.216  0.04311 2.129  1.204    0.04883 0.3939         
+         8 3.220  0.04730 2.133  1.208    0.05332 0.4087         
+         9 3.241  0.03619 2.155  1.196    0.04158 0.3934         
+        10 3.211  0.04041 2.149  1.174    0.04733 0.3759         
+        11 3.208  0.03217 2.149  1.165    0.04136 0.3721         
+        12 3.213  0.03515 2.151  1.166    0.04354 0.3700         
+
+The top 5 variables (out of 5):
+   DC, DMC, month, ISI, temp
+```{r}
+3.204^2
+```
+
+
+      Multiple Linear Regression(1/sqrt(area))   Random Forest   SVM     
+RMSE:             3414.09                         27.09         3.204
+MSE:              11656078                       733.78         10.266
+MAE:              754.74                          12.67         2.093                                
+
+
+Simulation: Doing the K-Fold Cross Validation for the SVM
+First of all, we split the weather variables and the time variables by the summer(June, July, Augest) with average temperature between 15-28C, and winter(December, January, February) with average temperature between 5-9C 
+```{r}
+# Load the data (assuming forestfires.csv is already read)
+data <- read.csv("~/Desktop/UMN/Senior/上/STAT4893W/Independent Research/forest+fires/forestfires.csv")
+
+# Filter for summer months with temperature between 15-28°C
+summer_data <- subset(data, month %in% c('jun', 'jul', 'aug') & temp >= 15 & temp <= 28)
+
+# Pre-processing
+summer_data$month <- as.factor(summer_data$month)
+summer_data$day <- as.factor(summer_data$day)
+summer_data$area <- sqrt(summer_data$area)
+
+# Apply K-fold cross-validation using SVM
+set.seed(4893)
+control <- trainControl(method = "cv", number = 10) # Change number for desired K in K-fold
+svm_model <- train(area ~ ., data = summer_data, method = "svmRadial", trControl = control)
+
+# Print the results
+print(svm_model)
+```
+
+```{r warning=FALSE}
+# Filter for winter months with temperature between 5-9°C
+winter_data <- subset(data, month %in% c('dec', 'jan', 'feb') & temp >= 5 & temp <= 9)
+
+# Pre-processing
+winter_data$month <- as.factor(winter_data$month)
+winter_data$day <- as.factor(winter_data$day)
+winter_data$area <- sqrt(winter_data$area)
+
+# Apply K-fold cross-validation using SVM
+set.seed(4893)
+control <- trainControl(method = "cv", number = 10) # Change number for desired K in K-fold
+svm_model <- train(area ~ ., data = winter_data, method = "svmRadial", trControl = control)
+
+# Print the results
+print(svm_model)
+```
+
+
+
+
+
+
+

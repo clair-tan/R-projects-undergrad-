@@ -1,0 +1,130 @@
+---
+title: "Independent Research -- Multiple Linear Regression"
+author: "Clair Tan"
+date: "2023-11-12"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+# Read the dataset
+forest_fires <- read.csv("~/Desktop/UMN/Senior/上/STAT4893W/Independent Research/forest+fires/forestfires.csv")
+```
+
+```{r}
+# Load necessary libraries
+library(readr)
+```
+
+```{r}
+# Convert 'month' and 'day' to factor variables
+forest_fires$month <- as.factor(forest_fires$month)
+forest_fires$day <- as.factor(forest_fires$day)
+```
+
+The key assumptions include linearity, homoscedasticity (constant variance of residuals), independence of errors, and normality of residuals.
+```{r}
+hist(forest_fires$area)
+```
+
+
+```{r fig.height=5}
+mod_full <- lm(area ~ ., data = forest_fires)
+par(mfrow = c(2, 2))
+plot(mod_full)
+```
+
+
+We're going to check the boxcox to find out which transformation we need to do. 
+```{r}
+library(MASS)
+forest_fires$area_modified <- forest_fires$area + 1
+boxcox(lm(area_modified ~ . -area, data = forest_fires))
+```
+
+Since the Box-Cox transformation have a zero value for area, we directly consider a log transformation (which is a specific case of the Box-Cox transformation with lambda = 0) by adding a small constant:
+```{r}
+# Apply log transformation to 'area' + 1 to handle zeros
+forest_fires$area_log <- log(forest_fires$area + 1)
+mod_full_log <- lm(area_log ~ . -area_modified - area, data = forest_fires)
+summary(mod_full_log)
+```
+
+Doing log transformation:
+Reducing Skewness: The distribution of the "area" variable in the dataset is highly skewed, with a concentration of values near zero and some very large values (outliers). Linear regression assumes that the residuals (differences between observed and predicted values) are normally distributed. A skewed dependent variable can lead to non-normally distributed residuals. Log transformation helps in stabilizing the variance and making the distribution more symmetric.
+
+Handling Outliers: Log transformation reduces the impact of outliers, because it brings large values closer to the mean. This is particularly useful when a few data points are much larger than the majority, as is the case with the "area" of forest fires.
+
+Interpretation of Coefficients: After log transformation, the interpretation of the regression coefficients changes. Instead of representing absolute changes, they represent percentage changes. For example, in a log-transformed model, a coefficient of 0.5 would mean that a one-unit increase in the predictor variable is associated with a 50% increase in the dependent variable.
+
+Multiplicative Relationships: When relationships between variables are multiplicative rather than additive, a log transformation can linearize these relationships, making them more suitable for linear regression.
+```{r}
+# Load necessary library for regression analysis
+library(lmtest)
+
+# Create the regression model
+mod_log <- lm(area_log ~ . -area_modified - area, data = forest_fires)
+summary(mod_log)
+```
+
+### Multiple Linear Regression Analysis
+
+1. **Coefficients**: 
+   - The coefficients indicate the relationship between each predictor and the log-transformed area of forest fires. Only a few predictors are statistically significant (e.g., `monthdec` and `DMC`), as indicated by their p-values (`**` for p < 0.01 and `*` for p < 0.05). 
+   - The sign of each coefficient (positive or negative) shows the direction of the relationship with the dependent variable. For example, `monthdec` has a positive coefficient, suggesting that fires in December tend to have a larger burned area.
+
+2. **Model Fit**:
+   - The `Multiple R-squared` value is 0.07426, which means that about 7.43% of the variability in the log-transformed area is explained by the model. This is relatively low, indicating that the model might not be capturing all the relevant factors influencing the area of forest fires.
+   - The `Adjusted R-squared` is 0.02315, which is adjusted for the number of predictors and can be a more accurate measure of model fit, especially when you have many predictors.
+
+3. **F-Statistic**:
+   - The F-statistic and its p-value test the overall significance of the model. The p-value is 0.06765, which is slightly above the typical alpha level of 0.05, suggesting that the model is not statistically significant at the 5% level.
+
+
+```{r}
+#model diagnostics
+par(mfrow = c(2, 2))
+plot(mod_log)
+```
+
+
+```{r}
+# Check for VIF
+vif(mod_log)
+```
+
+### Model Diagnostics
+
+1. **Residual Plots**:
+   - The residual plots are important for checking the assumptions of linear regression. The plots you have should include Residuals vs Fitted, Normal Q-Q, Scale-Location, and Residuals vs Leverage. These plots help assess homoscedasticity, normality of residuals, and identify outliers or influential points.
+   - The warning about not plotting observations with leverage one (observation 517) indicates that there might be a data point with high leverage, which could be an outlier or influential observation.
+
+2. **Variance Inflation Factor (VIF)**:
+   - VIF values help identify multicollinearity. Values greater than 5-10 might suggest significant multicollinearity. In your case, `DC` has a VIF of 26.83, which is quite high, indicating a potential multicollinearity issue. The `month` variable also shows a high GVIF (generalized VIF), suggesting multicollinearity among the month dummy variables.
+
+```{r}
+# Removing DC from the model since the high VIF
+mod_log_no_DC <- lm(area_log ~ . - DC  -area_modified - area, data = forest_fires)
+summary(mod_log_no_DC)
+vif(mod_log_no_DC)
+```
+
+
+
+```{r}
+# Fit the model with all possible interactions
+mod_log_interactions <- lm(area_log ~ . * . - DC - area_modified - area, data = forest_fires)
+# Compare the models using ANOVA
+anova(mod_log_no_DC, mod_log_interactions)
+summary(mod_log_interactions)
+```
+
+
+
+
+
+
+

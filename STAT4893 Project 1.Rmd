@@ -1,0 +1,233 @@
+---
+title: 'STAT4893 Project1: Truma'
+author: "Clair Tan"
+date: "2023-09-25"
+output:
+  html_document:
+    df_print: paged
+  word_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r}
+# Load required libraries
+library(dplyr)
+library(caret)
+library(glmnet)
+library(randomForest)
+library(FactoMineR)
+library(cluster)
+library(ggplot2)
+#library(prcomp)
+library(cluster)
+library(factoextra)
+```
+
+
+```{r}
+# Load the dataset
+data <- read.csv("~/Desktop/UMN/Senior/上/STAT4893W/Trauma Center Trauma Sensitive Yoga Study Compassion Fatigue and Coping/Data_STAT4893W.csv")
+
+# Creating the Age_Group variable
+age_levels <- c(paste0("AgeGroups_", 1:4))
+age_columns <- grep("AgeGroups_", names(data), value = TRUE)
+data$Age_Group <- apply(data[, age_columns], 1, function(x) age_levels[which(x != "")])
+
+# Adjusting for Latin variables
+latin_levels <- c(paste0("Latin_", 0:41), "Latin_888", "Latin_999")
+latin_columns <- grep("Latin_", names(data), value = TRUE)
+data$Latin <- apply(data[, latin_columns], 1, function(x) latin_levels[which(x != "")])
+
+# Adjusting for Race variables
+race_levels <- c(paste0("Race_", 1:24), "Race_999")
+race_columns <- grep("Race_", names(data), value = TRUE)
+data$Race <- apply(data[, race_columns], 1, function(x) race_levels[which(x != "")])
+
+# Convert to factor
+data$Age_Group <- factor(data$Age_Group, levels = age_levels)
+data$Latin <- factor(data$Latin, levels = latin_levels)
+data$Race <- factor(data$Race, levels = race_levels)
+
+# Replace "NA" with 0 in the entire data frame
+data[is.na(data)] <- 0
+str(data)
+summary(data)
+```
+
+
+```{r}
+
+
+# Select relevant column
+selected_data <- data[, c("CFS_SecondaryTrauma_ln", "CFS_JobBurnout_ln", "COPE_Positive", "COPE_MentalDis", "COPE_Venting","COPE_InstrumentalSup", "COPE_Active", "COPE_Denial", "COPE_Religious", "COPE_Humor", "COPE_BehavioralDis", "COPE_Restraint", "COPE_EmotionalSup", "COPE_Substance", "COPE_Acceptance", "COPE_Suppression", "COPE_Planning" )]
+
+# Remove rows with missing values
+selected_data <- na.omit(selected_data)
+
+```
+
+
+Object 1: Categorize and/or Rank the Coping Strategies
+$\\$
+lm.beta:$\\$
+```{r}
+# Load required libraries
+library(lm.beta)
+# Linear Regression for CFS_SecondaryTrauma_ln
+mod1 <- lm(CFS_SecondaryTrauma_ln ~ ., data = selected_data)
+beta1=lm.beta(mod1)
+beta1$coefficients
+summary(mod1)
+
+coef1 <- data.frame(var = names(coef(mod1)[-1]), coef = coef(mod1)[-1])
+ggplot(coef1, aes(x = var, y = coef)) + geom_col() + coord_flip() + labs(title = "Coefficients of mod1")
+
+```
+
+```{r}
+# Linear Regression for CFS_JobBurnout_ln
+mod2 <- lm(CFS_JobBurnout_ln ~ ., data = selected_data)
+summary.lm.beta(mod2)
+coef.lm.beta(mod2)
+
+coef2 <- data.frame(var = names(coef(mod2)[-1]), coef = coef(mod2)[-1])
+ggplot(coef2, aes(x = var, y = coef)) + geom_col() + coord_flip() + labs(title = "Coefficients of mod1")
+
+```
+
+
+
+$\\$
+Random Forest:$\\$
+```{r}
+set.seed(4893)
+# Random Forest for CFS_SecondaryTrauma_ln
+rf1 <- randomForest(CFS_SecondaryTrauma_ln ~ ., data = selected_data, importance = TRUE)
+varImpPlot(rf1, main="Variable Importance for rf1")
+importance(rf1)
+
+
+importance_df1 <- data.frame(Variable = rownames(importance(rf1)), Importance = importance(rf1)[, 1]) # Creating a data frame for the importances
+
+
+ggplot(importance_df1, aes(x = reorder(Variable, Importance), y = Importance)) + geom_col() + coord_flip() + labs(title = "Variable Importance for CFS_SecondaryTrauma_ln", x = "Variable", y = "Importance") # Creating a ggplot for rf1
+
+
+# Random Forest for CFS_JobBurnout_ln
+rf2 <- randomForest(CFS_JobBurnout_ln ~ ., data = selected_data, importance = TRUE)
+varImpPlot(rf2, main="Variable Importance for rf2")
+importance(rf2)
+
+importance_df2 <- data.frame(Variable = rownames(importance(rf2)), Importance = importance(rf2)[, 1]) # Creating a data frame for the importances
+
+
+ggplot(importance_df2, aes(x = reorder(Variable, Importance), y = Importance)) + geom_col() + coord_flip() + labs(title = "Variable Importance for CFS_JobBurnout_ln", x = "Variable", y = "Importance") # Creating a ggplot for rf2
+
+```
+
+
+
+Objective 2: Categorizing adaptive/maladaptive coping strategies.
+$\\$
+PCA:$\\$ scores
+```{r warning=FALSE}
+# Perform PCA
+pc <- prcomp(selected_data, scale = TRUE)
+summary(pc)
+screeplot(pc, type="lines", main="Scree Plot")
+
+biplot(pc)
+
+loadings <- pc$rotation[, 1:2]
+var_names <- rownames(loadings)
+loadings_df <- data.frame(Variable = var_names, loadings)
+
+
+#pca_result <- PCA(selected_data[, -c(1, 2)], scale.unit = TRUE)
+```
+
+$\\$
+K-Means-Clusters:$\\$  means for each groups no responses only on the 15 for means 
+
+```{r}
+# Select relevant column
+selected_data2 <- selected_data[, c("COPE_Positive", "COPE_MentalDis", "COPE_Venting","COPE_InstrumentalSup", "COPE_Active", "COPE_Denial", "COPE_Religious", "COPE_Humor", "COPE_BehavioralDis", "COPE_Restraint", "COPE_EmotionalSup", "COPE_Substance", "COPE_Acceptance", "COPE_Suppression", "COPE_Planning" )]
+
+# Remove rows with missing values
+selected_data2 <- na.omit(selected_data2)
+
+set.seed(4893)
+clust2 <- kmeans(selected_data2, centers = 2) #k=2
+clusplot(selected_data2, clust2$cluster, color=TRUE, shade=TRUE, labels=2, lines=0, main="2D Representation of 2 Clusters")
+
+clust3 <- kmeans(selected_data2, centers = 3) #k=3
+clusplot(selected_data2, clust3$cluster, color=TRUE, shade=TRUE, labels=2, lines=0, main="2D Representation of 3 Clusters")
+```
+```{r}
+#Explore clusters by using k=2
+cluster1_data <- selected_data2[clust2$cluster == 1,]
+cluster2_data <- selected_data2[clust2$cluster == 2,]
+
+summary(cluster1_data)
+summary(cluster2_data)
+```
+```{r}
+#Explore clusters by using k=3
+cluster_data_1 <- selected_data2[clust3$cluster == 1,]
+cluster_data_2 <- selected_data2[clust3$cluster == 2,]
+cluster_data_3 <- selected_data2[clust3$cluster == 2,]
+
+summary(cluster_data_1)
+summary(cluster_data_2)
+summary(cluster_data_3)
+```
+
+
+
+$\\$
+Descriptive and Demographic Tables(n, means, sd)
+```{r}
+# Categorical variables count
+age_group_count <- table(data$Age_Group)
+age_group_count
+latin_count <- table(data$Latin)
+latin_count
+race_count <- table(data$Race)
+race_count
+
+# Age summary
+age_summary <- summary(data$Age)
+
+# Descriptive statistics for ln CF variables
+ln_CF_summary <- data %>% 
+  summarise(n = n(),
+            mean = mean(CFS_ln, na.rm = TRUE),
+            sd = sd(CFS_ln, na.rm = TRUE))
+
+# Histogram for CFS_ln
+ggplot(data, aes(x = CFS_ln)) +
+  geom_histogram(binwidth = 0.5, fill = "blue", color = "black") +
+  labs(title = "Histogram of CFS_ln", x = "CFS_ln", y = "Frequency")
+
+# Boxplot for CFS_ln
+ggplot(data, aes(y = CFS_ln)) +
+  geom_boxplot(fill = "lightblue", color = "black") +
+  labs(title = "Boxplot of CFS_ln", x = "", y = "CFS_ln")
+
+# Selecting variables for correlation table
+selected_vars <- data %>% select(CFS_ln, Age, Income)
+
+# Creating the correlation table
+correlation_table <- cor(selected_vars, use = "complete.obs")
+correlation_table
+
+
+```
+
+
+
