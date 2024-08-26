@@ -1,0 +1,345 @@
+---
+title: "STAT5401 Final Exam Yuzhao Tan"
+author: "Clair Tan"
+date: "2023-05-03"
+output:
+  pdf_document: 
+    latex_engine: xelatex
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Question 1$\\$
+```{r}
+Q1_test <- read.csv("~/Desktop/UMN/Junior/下/STAT5401 Applied Multivariate Methods/Final Exam/Q1_test.csv")
+Q1_train <- read.csv("~/Desktop/UMN/Junior/下/STAT5401 Applied Multivariate Methods/Final Exam/Q1_train.csv")
+Q1 <- read.csv("~/Desktop/UMN/Junior/下/STAT5401 Applied Multivariate Methods/Final Exam/Q1.csv")
+```
+
+1a)$\\$
+i)
+```{r}
+#Q1<-na.omit(Q1)
+mod1a<-lm(Life.expectancy~Status+Adult.Mortality+infant.deaths+percentage.expenditure+Schooling+Hepatitis.B+GDP+Population+Alcohol,data=Q1)
+summary(mod1a)
+```
+$\\$
+From the above table result we can see that at alpha=0.05 StatusDeveloping, Adult.Mortality, infant.deaths, Schooling, Hepatitis and Alcohol are significant. From the coefficients we can know that StatusDeveloping, Adult.Mortality, infant.deaths and Alcohol will have negative effects; Schooling and Hepatitis have a positive effects on the Life.expectancy.
+$\\$
+
+ii) The previous results is reasonable. The Adult.Mortality and Schooling are the two significant covariates，when the adult mortality rate increase it means the life expectancy would decrease(less people being elder). For the schooling year, people who're more educated will be more careful for their health, so when schooling increases the life expectancy would increase.
+$\\$
+
+iii)
+```{r}
+mod1a2<-lm(Life.expectancy~Status+Adult.Mortality+infant.deaths+percentage.expenditure+Schooling+Hepatitis.B+Alcohol,data=Q1)
+anova(mod1a2, mod1a)
+```
+$\\$
+The above result shows the p-value is 0.1164>0.05, we fail to reject the null hypothesis, so we can conclude that the model doesn't include GDP and Population would not fit the model significantly better than the model we get in part i.
+$\\$
+
+1b)$\\$
+i)
+```{r}
+mod1a_full<-lm(Life.expectancy~Status+Adult.Mortality+infant.deaths+percentage.expenditure+Schooling+Hepatitis.B+GDP+Population+Alcohol,data=Q1_train)
+mod1a_reduce<-lm(Life.expectancy~Status+Adult.Mortality+infant.deaths+percentage.expenditure+Schooling+Hepatitis.B+Alcohol,data=Q1_train)
+anova(mod1a_reduce, mod1a_full)
+```
+
+```{r warning=FALSE}
+pre_mod1afull<-predict(mod1a_full)
+pre_mod1ared<-predict(mod1a_reduce)
+#mean square error by using the predicted value and the true life expectancy using the test dataset
+mean((pre_mod1afull-Q1_test$Life.expectancy)^2)
+mean((pre_mod1ared-Q1_test$Life.expectancy)^2)
+```
+$\\$
+
+ii) By the above results, since the mse for the full model is lower(129.4554<129.5306), so we'll conclude that the full model predict the life expectancy better.$\\$
+$\\$
+
+Question 2$\\$
+```{r}
+Q2 <- read.csv("~/Desktop/UMN/Junior/下/STAT5401 Applied Multivariate Methods/Final Exam/Q2.csv")
+```
+
+2a)$\\$
+i)
+```{r}
+library(psych)
+library(GPArotation)
+fa.oblique<-fa(Q2,4,rotate="oblimin")
+plot(fa.oblique)
+fa.oblique
+```
+
+
+```{r}
+loadings(fa.oblique, cutoff=0.5)
+```
+$\\$
+
+ii)
+```{r}
+fa.oblique$Phi
+```
+$\\$
+There's a negative weak correlation between MR1 and MR2, MR1 and MR3, MR1 and MR4，and a positive weak correlation between MR2 and MR3, MR2 and MR4, MR3 and MR4.
+$\\$
+
+b)
+```{r}
+fa.varimax<-fa(Q2,4,rotate="varimax")
+plot(fa.varimax)
+fa.varimax
+```
+```{r}
+loadings(fa.varimax, cutoff=0.4)
+```
+$\\$
+The result we get by the orthogonal factor analysis model is more parsimonious loading matrix.
+$\\$
+
+c)
+```{r}
+fa.oblique2<-fa(Q2,2,rotate="oblimin")
+plot(fa.oblique2)
+fa.oblique2
+```
+
+```{r}
+fa.oblique2$Phi
+```
+
+$\\$
+The correlation here we get for MR1 and MR2 is still weakly negative, but the absolute value of the correlation increase from about 0.04 to 0.17.
+$\\$
+
+d)$\\$
+i) The variables here means the point scales of the response for 39 questions. For Q6, the question is "I can easily put my beliefs, opinions, and expectations into words" when the individual has the value 5, it means that the individual can always easily put his/her beliefs, opinions, and expectations into words.
+$\\$
+
+ii) According to the reference paper we know that the four factors here means the a clear four-factor solution corresponding closely to the four mindfulness skills for which the items were written. So ML1-Accept Without Judgment items，MR2-Observe items, ML3-Describe items, ML4-Act With Awareness items.
+$\\$
+
+iii) For the orthogonal factor analysis model in part b, ML1-Accept Without Judgment items，MR2-Observe items, ML3-Describe items, ML4-Act With Awareness items.$\\$
+And for the orthogonal factor analysis model in part c, MR1-Discribe items, and MR2-Accept Without Judgment items
+$\\$
+
+iv) part (a.ii) says there's a negative weak correlation between MR1-Accept Without Judgment items and MR2-Observe items, ML1-Accept Without Judgment items and ML3-Describe items, MR1-Accept Without Judgment items and MR4-Act With Awareness items，and a positive weak correlation between MR2-Observe items and MR3-Describe item, MR2-Observe items and MR4-Act With Awareness items, MR3-Describe items and MR4-Act With Awareness items. It look reasonable to me, since when we accept more things with less judgment, it means we would pay less attention to observe and describe them. And when we pay more attention on observe things, it means that there'll be more describe.
+$\\$
+$\\$
+
+Question 3$\\$
+3a)
+```{r}
+n<-1000
+p<-200
+
+#Generate a random matrix with rank 2
+set.seed(2023) #set the seed for reproducibility
+U <- matrix(rnorm(n*2), nrow = n, ncol = 2)
+V <- matrix(rnorm(p*2), nrow = p, ncol = 2)
+M <- U %*% t(V)
+E <- matrix(rnorm(n*p), nrow = n, ncol = p) # Generate a noise matrix
+# Create the data matrix by adding the noise to the rank-2 matrix
+X <- M + E
+```
+
+```{r}
+pccor<-princomp(X, cor=T)
+plot(pccor$sdev^2, type="b", xlab="PC number", ylab="Variance", main="Scree Plot")
+sum(pccor$sdev[1]^2)/sum(pccor$sdev^2)
+```
+$\\$
+From the above result we can see that the variance of the first principle components is about 64. $\\$
+The proportion of the total variance explained by the first PC is about 0.33. $\\$
+Based on the scree plot, we'll choose 3 principal components.
+$\\$
+
+3b)$\\$
+i)
+```{r}
+system.time(princomp(X))
+system.time(prcomp(X))
+```
+$\\$
+By the previous result we get for the time of running, we can see that the princomp(X) takes a shorter time to complete.
+$\\$
+
+ii)
+```{r warning=FALSE}
+for (i in 1:20){
+  n<-1000
+  p<-200
+  #Generate a random matrix with rank 2
+  set.seed(2023) #set the seed for reproducibility
+  U[i] <- matrix(rnorm(n*2), nrow = n, ncol = 2)
+  V[i] <- matrix(rnorm(p*2), nrow = p, ncol = 2)
+  M[i] <- U %*% t(V)
+  E[i] <- matrix(rnorm(n*p), nrow = n, ncol = p) # Generate a noise matrix
+  # Create the data matrix by adding the noise to the rank-2 matrix
+  X[i] <- M + E
+}
+
+system.time(princomp(X))
+system.time(prcomp(X))
+```
+$\\$
+Our result will be the same with part(b.i) that the princomp(X) function take a shorter time.
+$\\$
+$\\$
+
+Question 4$\\$
+```{r}
+Q4 <- load("~/Desktop/UMN/Junior/下/STAT5401 Applied Multivariate Methods/Final Exam/Q4.Rdata")
+
+dim(train_dataset)
+dim(test_dataset)
+```
+$\\$
+
+4a)$\\$
+i)
+```{r}
+length(unique(train_dataset$label))
+```
+$\\$
+From the above result, we can see that there're 10 groups.
+$\\$
+
+ii)
+```{r}
+display_image <- function(vec) {
+  # Install and load necessary packages
+  if (!requireNamespace("grid", quietly = TRUE)) { 
+    install.packages("grid")
+  }
+  library(grid)
+  vec = as.numeric(vec)
+  # Split the data into R, G, and B channels
+  channel_length <- 256
+  R_channel <- vec[1:channel_length]
+  G_channel <- vec[(channel_length + 1):(2 * channel_length)] 
+  B_channel <- vec[(2 * channel_length + 1):(3 * channel_length)]
+  
+  # Reshape the data
+  R_reshaped <- matrix(R_channel, nrow = 16, ncol = 16, byrow = T) 
+  G_reshaped <- matrix(G_channel, nrow = 16, ncol = 16, byrow = T) 
+  B_reshaped <- matrix(B_channel, nrow = 16, ncol = 16, byrow = T)
+  
+  # Normalize the data to the range [0, 1]
+  R_normalized <- R_reshaped / 255 
+  G_normalized <- G_reshaped / 255 
+  B_normalized <- B_reshaped / 255
+  
+  # Combine the normalized R, G, and B channels using the rgb function
+  col <- rgb(R_normalized, G_normalized, B_normalized)
+  # Set the dimensions of the col object
+  dim(col) <- dim(R_reshaped)
+  # Display the image
+  grid.newpage()
+  grid.raster(col, interpolate = FALSE)
+}
+```
+
+
+```{r}
+display_image(train_dataset[1,-1])
+```
+
+```{r}
+display_image(train_dataset[2,-1])
+```
+
+```{r}
+display_image(train_dataset[258,-258])
+```
+
+```{r}
+display_image(train_dataset[513,-513])
+```
+$\\$
+
+4b)$\\$
+i)
+```{r}
+library(MASS)
+lda.fit<-lda(label~., data = train_dataset) 
+lda.pred.train<-predict(lda.fit, train_dataset) 
+#the error rate based on the training data
+1-mean(lda.pred.train$class==train_dataset$label)
+```
+$\\$
+ii)
+```{r}
+lda.pred.test<-predict(lda.fit, test_dataset) 
+#the error rate based on the training data
+1-mean(lda.pred.test$class==test_dataset$label)
+```
+$\\$
+
+iii) The test error rate we get by the training data is 0.1445 and the test error rate by using the test data is pretty large which is 0.754.
+$\\$
+
+iv)
+```{r}
+lda.pred.random<-predict(lda.fit, cbind(train_dataset, test_dataset)) 
+#the error rate based on random guess
+1-mean(lda.pred.test$class==cbind(train_dataset$label, test_dataset$label))
+```
+$\\$
+From the above result, we can see that when we randomly guess the group lab, the error rate we get here is higher than what we get in part(b.ii). It means that the LDA perform better in part(b.ii) than random guess.
+$\\$
+
+v)
+```{r}
+## confusion matrix on testing  matrix
+table(lda.pred.test$class,test_dataset$label)
+```
+$\\$
+By the confusion matrix, 2 and 7, 4 and 2 are the two groups most difficult to be distinguished by LDA.
+$\\$
+
+4c)$\\$
+i)
+```{r}
+require(randomForest)
+set.seed(2023)
+rf_mod <- randomForest(as.factor(label) ~ ., data = train_dataset, ntree = 100)
+pred.rf <- predict(rf_mod, newdata = test_dataset[,-1], type = "response" )
+pred.rf.train <- predict(rf_mod, newdata = train_dataset[,-1], type = "response" )
+```
+
+```{r}
+#MSE on the training data
+train<-train_dataset[,1]
+mean((as.numeric(pred.rf.train)-train)^2)
+```
+$\\$
+
+ii)
+```{r}
+#MSE on the test data
+test<-test_dataset[,1]
+mean((as.numeric(pred.rf)-test)^2)
+```
+$\\$
+
+d) The error rate we get by using LDA is smaller than what we get by using the randomForest. We would say that the LDA model will do a better prediction here.
+
+
+
+
+
+
+
+
+
+
+
+
+
